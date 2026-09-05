@@ -1,0 +1,62 @@
+name: OKN DSP Bootstrap
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Extract OKN DSP project
+        run: |
+          set -e
+          ZIP=$(find . -maxdepth 2 -type f -name 'OKN_DSP_APP_V3_PROTOCOL_CAPTURE_READY.zip' | head -n 1)
+          test -n "$ZIP"
+          mkdir -p /tmp/okn
+          unzip -q "$ZIP" -d /tmp/okn
+          ROOT=$(find /tmp/okn -mindepth 1 -maxdepth 1 -type d | head -n 1)
+          if [ -n "$ROOT" ]; then
+            cp -a "$ROOT"/. .
+          else
+            cp -a /tmp/okn/. .
+          fi
+          rm -f "$ZIP"
+
+      - name: Commit project automatically
+        run: |
+          git config user.name "OKN DSP Bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add .
+          if ! git diff --cached --quiet; then
+            git commit -m "Build OKN DSP project"
+            git push
+          fi
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.10"
+
+      - name: Build APK
+        run: gradle :app:assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: OKN-DSP-APK
+          path: app/build/outputs/apk/debug/app-debug.apk
